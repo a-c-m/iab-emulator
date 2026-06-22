@@ -1,0 +1,5 @@
+# Standalone child repo (ADR 0005). This file's presence stops pnpm walking
+# up to the parent base-app workspace — without it, `pnpm install` here would
+# attach to the parent's 13-project workspace. No members: the root
+# package.json is the only project.
+packages: []

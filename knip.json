@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/restrictions/index.ts",
+    "src/detect/index.ts",
+    "src/integrations/vite.ts",
+    "src/integrations/next.ts",
+    "src/integrations/webpack.ts",
+    "src/integrations/playwright.ts",
+    "test/**/*.test.ts",
+    "e2e/**/*.spec.ts"
+  ],
+  "project": ["src/**/*.ts", "e2e/**/*.ts", "demo/**/*.ts"],
+  "ignoreBinaries": ["trivy"]
+}

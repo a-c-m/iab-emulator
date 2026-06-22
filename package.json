@@ -1,0 +1,128 @@
+{
+  "name": "iab-emulator",
+  "version": "0.1.0",
+  "description": "Emulate in-app browser (IAB) restrictions — Meta, TikTok, LinkedIn, Snapchat, Pinterest — in local dev and Playwright tests. Lowest-common-denominator testing for paid-social traffic.",
+  "keywords": [
+    "in-app-browser",
+    "iab",
+    "wkwebview",
+    "webview",
+    "meta",
+    "instagram",
+    "facebook",
+    "tiktok",
+    "linkedin",
+    "snapchat",
+    "playwright",
+    "vite",
+    "next",
+    "testing",
+    "emulation"
+  ],
+  "license": "MIT",
+  "author": "Alex McFadyen",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a-c-m/iab-emulator.git"
+  },
+  "homepage": "https://github.com/a-c-m/iab-emulator#readme",
+  "bugs": {
+    "url": "https://github.com/a-c-m/iab-emulator/issues"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/restrictions/index.d.ts",
+      "default": "./dist/restrictions/index.js"
+    },
+    "./detect": {
+      "types": "./dist/detect/index.d.ts",
+      "default": "./dist/detect/index.js"
+    },
+    "./vite": {
+      "types": "./dist/integrations/vite.d.ts",
+      "default": "./dist/integrations/vite.js"
+    },
+    "./next": {
+      "types": "./dist/integrations/next.d.ts",
+      "default": "./dist/integrations/next.js"
+    },
+    "./webpack": {
+      "types": "./dist/integrations/webpack.d.ts",
+      "default": "./dist/integrations/webpack.js"
+    },
+    "./playwright": {
+      "types": "./dist/integrations/playwright.d.ts",
+      "default": "./dist/integrations/playwright.js"
+    }
+  },
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "prebuild": "pnpm clean",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "demo": "vite --config demo/vite.config.ts",
+    "lint": "biome check --write",
+    "lint:check": "biome check",
+    "knip": "knip",
+    "security": "trivy fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --exit-code 1 --ignorefile .trivyignore .",
+    "check": "pnpm lint:check && pnpm typecheck && pnpm build && pnpm test:cov && pnpm knip && pnpm security",
+    "verify": "pnpm lint:check && pnpm typecheck && pnpm knip && pnpm test:cov && pnpm build",
+    "prepare": "lefthook install",
+    "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.40",
+    "next": ">=13",
+    "vite": ">=4",
+    "webpack": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    },
+    "next": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    },
+    "webpack": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.15",
+    "@commitlint/cli": "21.0.1",
+    "@commitlint/config-conventional": "21.0.1",
+    "@playwright/test": "1.61.0",
+    "@types/jsdom": "28.0.3",
+    "@types/node": "22.19.17",
+    "@typescript/native-preview": "7.0.0-dev.20260425.1",
+    "@vitest/coverage-v8": "4.1.7",
+    "jsdom": "29.1.1",
+    "knip": "6.14.2",
+    "lefthook": "2.1.8",
+    "next": "16.2.9",
+    "typescript": "6.0.3",
+    "ultracite": "7.8.0",
+    "vite": "8.0.16",
+    "vitest": "4.1.7",
+    "webpack": "5.107.2"
+  }
+}

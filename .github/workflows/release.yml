@@ -1,0 +1,68 @@
+name: Release
+
+# Publishes to npm on a v* tag via OIDC **trusted publishing** (no stored token)
+# plus build provenance.
+#
+# ONE-TIME SETUP before the first release (the package + repo must exist first):
+#   1. Create the GitHub repo `a-c-m/iab-emulator` and reserve the npm package name.
+#   2. On npmjs.com → the package → Settings → Trusted Publishers, add this repo +
+#      workflow (`release.yml`) as a trusted publisher. No `NPM_TOKEN` secret is
+#      needed — auth is via the GitHub OIDC token below.
+#   3. (Recommended) Create a GitHub Environment named `npm-publish` with required
+#      reviewers, so a human approves each publish.
+# NOTE: a tag push does NOT trigger ci.yml (that runs on push-to-main + PRs), so
+# this job runs `pnpm verify` itself — but it does not run e2e or Trivy. Only tag
+# commits that are already green on `main` (CI passed there); the tag inherits
+# that history.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    # Gate: configure required reviewers on this environment to approve releases.
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write # OIDC — trusted publishing auth + provenance
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Verify the tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $PKG"
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Use latest npm (OIDC trusted-publishing support)
+        run: npm install -g npm@latest
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify (lint, typecheck, knip, test, build)
+        run: pnpm verify
+
+      - name: Publish
+        run: npm publish --provenance --access public

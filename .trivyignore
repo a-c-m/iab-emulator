@@ -1,0 +1,9 @@
+# Trivy ignore list. Entries land here with a reason + review date, mirroring
+# base-app ADR 0008. Empty by default.
+#
+# Source of truth: CI's Trivy scan (.github/workflows/ci.yml, the `security`
+# job) is authoritative. The local `pnpm security` script is a best-effort
+# convenience and may differ slightly in invocation/output. Since the published
+# tarball ships no runtime dependencies, the `vuln` scanner's value here is
+# limited to the build toolchain — don't gate a release on a transitive
+# build-tool CVE; `secret` + `misconfig` are the gates that matter.

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>iab-emulator capability dashboard</title>
+  </head>
+  <body>
+    <h1>iab-emulator capability dashboard</h1>
+    <p>
+      This page probes browser capabilities that in-app browsers restrict. With emulation active
+      (Vite plugin or Playwright fixture) the probes report the restricted state; without it, they
+      report the real browser's state.
+    </p>
+
+    <ul>
+      <li>PaymentRequest: <strong data-testid="payment-request">?</strong></li>
+      <li>navigator.serviceWorker: <strong data-testid="service-worker">?</strong></li>
+      <li>detected IAB app (client UA): <strong data-testid="detected-app">?</strong></li>
+      <li>server-observed user-agent: <code data-testid="server-ua">?</code></li>
+    </ul>
+
+    <p>
+      <button id="popup-btn" type="button">open cross-origin popup</button>
+      <strong aria-live="polite" data-testid="popup-result">?</strong>
+    </p>
+
+    <p>
+      <button id="popups-btn" type="button">probe supportsPopups()</button>
+      <strong aria-live="polite" data-testid="popups-result">?</strong>
+    </p>
+
+    <p>
+      <a id="blank-link" target="_blank" href="http://127.0.0.1:9/">external link (new tab)</a>
+      <strong aria-live="polite" data-testid="blank-result">?</strong>
+    </p>
+
+    <pre data-testid="client-ua"></pre>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

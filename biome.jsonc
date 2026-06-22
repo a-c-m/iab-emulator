@@ -1,0 +1,61 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/biome/core", "ultracite/biome/vitest"],
+  "files": {
+    "includes": ["**/*.ts", "**/*.js", "**/*.json", "**/*.jsonc"],
+    "ignoreUnknown": true
+  },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "linter": {
+    "rules": {
+      "style": {
+        "useNamingConvention": "off",
+        // Build/test config (vite.config, playwright.config) legitimately reads
+        // env to gate behaviour.
+        "noProcessEnv": "off"
+      },
+      "suspicious": {
+        // This package IS diagnostic tooling: emulate() bodies and the dev
+        // plugins intentionally log to the console so developers can see what
+        // an in-app browser blocks.
+        "noConsole": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      // The exports-map entrypoints are intentional re-export barrels;
+      // playwright.ts re-exports `expect` for `import { test, expect }` ergonomics.
+      "includes": ["src/**/index.ts", "src/integrations/playwright.ts"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noBarrelFile": "off"
+          }
+        }
+      }
+    },
+    {
+      // serializable.test.ts drives assertions through a table of helper
+      // functions, so `expect` legitimately appears outside an it() body.
+      "includes": ["test/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noMisplacedAssertion": "off"
+          }
+        }
+      }
+    }
+  ]
+}

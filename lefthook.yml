@@ -1,0 +1,27 @@
+# Standalone child repo hooks (ADR 0005 — each child runs its own lefthook).
+# Lean by design: format/lint staged files on commit, lint commit message,
+# and run the full typecheck + test gate before a push. Secret scanning and
+# Trivy live in CI (.github/workflows/ci.yml) so contributors don't need extra
+# local binaries.
+output: false
+
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{ts,js,json,jsonc}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}
+
+pre-push:
+  parallel: true
+  commands:
+    typecheck:
+      run: pnpm typecheck
+    test:
+      run: pnpm test

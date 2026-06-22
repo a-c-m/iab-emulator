@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+*.tsbuildinfo
+.DS_Store
+trivy-results.sarif
+.beads/
+.ai-wip/
+.ai-*.log
+.ai-wip-install.log
