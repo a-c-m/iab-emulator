@@ -81,378 +81,364 @@
         color: #fff; display: flex; align-items: center; justify-content: center;
         font-size: 12px; margin-top: 8px;
       }
+      #spframe { width: 100%; height: 230px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); margin-top: 8px; }
     </style>
   </head>
   <body>
-    <h1>IAB Capability Probe <span class="note">v2</span></h1>
-    <p class="sub">
-      Load in a real in-app browser (Facebook, Instagram, TikTok…) to capture ground truth.
-      Passive checks run on load; <strong>behavior</strong> tests need a tap because they actually
-      call the API. Everything is also <code>console.log</code>ged as one JSON blob tagged
-      <code>[iab-probe]</code> — attach via <code>chrome://inspect</code> (Android) or
-      Safari&nbsp;›&nbsp;Develop (iOS).
-    </p>
-
-    <div class="card">
-      <h2>Environment</h2>
-      <div class="ua" id="ua"></div>
-      <div class="note" id="detected" style="margin-top: 8px"></div>
-    </div>
-
-    <div class="card">
-      <h2>Behavior — tap each (calls the real API)</h2>
-      <div class="row" style="margin-bottom: 8px">
-        <button id="runAll" class="small">Run all</button>
-        <span class="note">window.open opens a visible tab you must eyeball; the rest report resolve/reject.</span>
-      </div>
-      <table id="behavior"></table>
-      <div id="fsbox">fullscreen target</div>
-    </div>
-
-    <div class="card">
-      <h2>Capabilities (presence only)</h2>
-      <p class="note">Whether the API <em>exists</em>. Presence ≠ works — see the behavior tests above for the ones that matter.</p>
-      <table id="caps"></table>
-    </div>
-
-    <div class="card">
-      <h2>Injected globals (fingerprints)</h2>
-      <p class="note">Own properties on the top frame absent from a pristine same-origin iframe of the same engine — i.e. host injections. Vendor-matched names flagged ★.</p>
-      <table id="injected"></table>
-    </div>
-
-    <div class="card">
-      <h2>Snapshot JSON</h2>
-      <div class="row">
-        <button id="copyBtn">Copy</button>
-        <span class="note" id="copyResult"></span>
-      </div>
-      <pre id="json"></pre>
-    </div>
-
+    <div id="app"></div>
     <script>
-      // Self-contained, no build, no deps. Runs anywhere.
+      // Single self-contained, dependency-free probe. Dual-mode:
+      //  - TOP frame  -> full capability battery + a cross-site storage-access test.
+      //  - IN an iframe -> acts as the third-party frame for that storage test.
+      // Deliberately old-style JS so it runs in ancient in-app WebViews.
       (function () {
-        var results = {};
-
-        function set(id, html) {
-          var el = document.getElementById(id);
-          if (el) el.innerHTML = html;
-        }
-        function statusCell(present) {
-          return present
-            ? '<span class="status ok">present</span>'
-            : '<span class="status blocked">absent</span>';
-        }
-        function esc(s) {
-          return String(s).replace(/</g, "&lt;");
+        var IS_FRAME = window.top !== window.self;
+        if (IS_FRAME) {
+          runFrameMode();
+        } else {
+          runTopMode();
         }
 
-        // --- Environment ---
-        var win = window;
-        var nav = navigator;
-        var ua = nav.userAgent || "";
-        set("ua", esc(ua));
-
-        var APP_PATTERNS = [
-          ["meta-fb", /FBAN|FBAV|FB_IAB|FB4A/i],
-          ["meta-ig", /Instagram/i],
-          ["tiktok", /musical_ly|TikTok|trill/i],
-          ["linkedin", /LinkedInApp/i],
-          ["snapchat", /Snapchat/i],
-          ["pinterest", /Pinterest/i],
-        ];
-        var detectedApp = null;
-        for (var i = 0; i < APP_PATTERNS.length; i++) {
-          if (APP_PATTERNS[i][1].test(ua)) {
-            detectedApp = APP_PATTERNS[i][0];
-            break;
+        // ---------------------------------------------------------------------
+        // FRAME MODE — the third-party (cross-site) storage-access probe.
+        // ---------------------------------------------------------------------
+        function runFrameMode() {
+          document.title = "iab-probe (3p frame)";
+          document.getElementById("app").innerHTML =
+            '<div style="font:13px/1.5 system-ui,sans-serif">' +
+            'Third-party frame · <code id="o"></code> <span id="w" style="color:#cf222e;font-weight:600"></span>' +
+            '<button id="run" style="font:inherit;padding:10px 14px;margin:8px 0;width:100%">Run storage test (tap here)</button>' +
+            '<pre id="out" style="font-size:11px;white-space:pre-wrap;word-break:break-all"></pre></div>';
+          var out = document.getElementById("out");
+          document.getElementById("o").textContent = location.origin;
+          var sameOrigin = false;
+          try { sameOrigin = window.parent.location.origin === location.origin; } catch (e) { sameOrigin = false; }
+          if (sameOrigin) {
+            document.getElementById("w").textContent = "· SAME-ORIGIN (not a third-party test)";
           }
-        }
-        results.userAgent = ua;
-        results.detectedApp = detectedApp;
-        results.isIAB = detectedApp !== null;
-        set(
-          "detected",
-          detectedApp
-            ? "Detected in-app browser: <strong>" + detectedApp + "</strong>"
-            : "No known in-app browser detected (looks like a normal browser)."
-        );
 
-        // --- Passive capability battery ---
-        var checks = [
-          ["window.PaymentRequest", "PaymentRequest" in win, false, "Stripe/Apple/Google Pay via PaymentRequest"],
-          ["window.ApplePaySession", "ApplePaySession" in win, false, "Apple Pay JS (iOS only)"],
-          ["navigator.serviceWorker", "serviceWorker" in nav, false, "PWA / offline / push"],
-          ["navigator.clipboard", "clipboard" in nav, true, "presence; see behavior test"],
-          ["navigator.share", "share" in nav, true, "Web Share"],
-          ["navigator.credentials", "credentials" in nav, null, "WebAuthn/passkeys"],
-          ["window.PublicKeyCredential", "PublicKeyCredential" in win, null, "passkeys"],
-          ["document.requestStorageAccess", !!document.requestStorageAccess, true, "presence; see behavior test"],
-          ["Element.requestFullscreen", !!(win.Element && Element.prototype.requestFullscreen), true, "presence; see behavior test"],
-          ["window.Notification", "Notification" in win, null, "web push permission"],
-          ["navigator.mediaDevices.getUserMedia", !!(nav.mediaDevices && nav.mediaDevices.getUserMedia), null, "camera/mic"],
-          ["window.RTCPeerConnection", "RTCPeerConnection" in win, null, "WebRTC"],
-          ["navigator.geolocation", "geolocation" in nav, true, "presence; prompt may be blocked"],
-          ["window.indexedDB", "indexedDB" in win, true, "subject to 7-day purge on iOS"],
-          ["window.localStorage", "localStorage" in win, true, "subject to 7-day purge on iOS"],
-          ["navigator.cookieEnabled", nav.cookieEnabled === true, true, ""],
-          ["window.WebGLRenderingContext", "WebGLRenderingContext" in win, true, ""],
-          ["window.showOpenFilePicker", "showOpenFilePicker" in win, false, "File System Access API"],
-          ["document.featurePolicy", !!(document.featurePolicy || document.policy), null, "reported present in 2019 FB4A"],
-        ];
-        var capHtml = "";
-        var caps = {};
-        for (var c = 0; c < checks.length; c++) {
-          var label = checks[c][0], present = !!checks[c][1], expected = checks[c][2], note = checks[c][3];
-          caps[label] = present;
-          var mismatch =
-            expected !== null && present !== expected
-              ? '<span class="status warn"> ⚠ unexpected</span>' : "";
-          capHtml +=
-            "<tr><td>" + label + "</td><td>" + statusCell(present) + mismatch +
-            '</td><td class="note">' + note + "</td></tr>";
-        }
-        set("caps", capHtml);
-        results.capabilities = caps;
-
-        // --- Behavior tests (actually call the API) ---
-        results.behavior = {};
-
-        function fmt(rec) {
-          if (rec.status === "resolved" || rec.status === "constructed" || rec.opened === true) {
-            return '<span class="status ok">' + esc(rec.status || "opened") + "</span> " +
-              '<span class="note">' + esc(rec.detail || "") + "</span>";
+          function post(rec) {
+            rec.frameOrigin = location.origin;
+            out.textContent = JSON.stringify(rec, null, 2);
+            try { parent.postMessage({ source: "iab-3p", payload: rec }, "*"); } catch (e) {}
           }
-          if (rec.status === "rejected" || rec.status === "error" || rec.opened === false) {
-            return '<span class="status blocked">' + esc(rec.status || "blocked") + "</span> " +
-              '<span class="note">' + esc(rec.detail || "") + "</span>";
-          }
-          if (rec.status === "unsupported") {
-            return '<span class="status warn">unsupported</span>';
-          }
-          return '<span class="note">' + esc(rec.detail || "?") + "</span>";
-        }
+          post({ phase: "loaded" });
 
-        async function testWindowOpen() {
-          var rec = {};
-          try {
-            var h = win.open("about:blank", "_blank");
-            if (h === null) {
-              rec.opened = false;
-              rec.detail = "window.open returned null — popup blocked.";
-              return rec;
-            }
-            rec.opened = true;
+          document.getElementById("run").addEventListener("click", async function () {
+            var runBtn = this;
+            var rec = { phase: "result" };
+            try { rec.hasAccessBefore = await document.hasStorageAccess(); }
+            catch (e) { rec.hasAccessBefore = "error: " + (e.message || e); }
+            // The real call: third-party frame, inside a user gesture.
+            try { await document.requestStorageAccess(); rec.requestStorageAccess = "resolved"; }
+            catch (e) { rec.requestStorageAccess = "rejected: " + (e.name || "Error") + " " + (e.message || e); }
+            try { rec.hasAccessAfter = await document.hasStorageAccess(); }
+            catch (e) { rec.hasAccessAfter = "error: " + (e.message || e); }
             try {
-              h.document.write(
-                "<meta name=viewport content='width=device-width'>" +
-                "<body style='font:18px sans-serif;padding:24px'>iab-probe popup ✓<br>" +
-                "If you can read this, window.open produced a visible view.<br><br>" +
-                "<button onclick='window.close()' style='font-size:16px;padding:8px 14px'>close</button></body>"
-              );
-              rec.docWritable = true;
-            } catch (e) {
-              rec.docWritable = false;
+              document.cookie = "iabprobe=1; path=/; SameSite=None; Secure";
+              rec.thirdPartyCookie = /(?:^|; )iabprobe=1(?:;|$)/.test(document.cookie)
+                ? "readback OK" : "written but not readable (blocked/partitioned)";
+            } catch (e) { rec.thirdPartyCookie = "error: " + (e.message || e); }
+            try {
+              localStorage.setItem("iabprobe", "1");
+              rec.localStorage = localStorage.getItem("iabprobe") === "1" ? "readback OK" : "not readable";
+            } catch (e) { rec.localStorage = "blocked: " + (e.name || "Error") + " " + (e.message || e); }
+            post(rec);
+            runBtn.style.background = "#1a7f37";
+            runBtn.style.borderColor = "#1a7f37";
+            runBtn.style.color = "#fff";
+            runBtn.textContent = "done ✓";
+          });
+        }
+
+        // ---------------------------------------------------------------------
+        // TOP MODE — the full capability probe.
+        // ---------------------------------------------------------------------
+        function runTopMode() {
+          var TOP_HTML = [
+            '<h1>IAB Capability Probe <span class="note">v3</span></h1>',
+            '<p class="sub">Load in a real in-app browser to capture ground truth. Passive checks run on load; <strong>behavior</strong> tests need a tap because they call the API; the <strong>storage-access</strong> card embeds a cross-site third-party frame. Everything is also <code>console.log</code>ged as one <code>[iab-probe]</code> JSON blob.</p>',
+            '<div class="card"><h2>Environment</h2><div class="ua" id="ua"></div><div class="note" id="detected" style="margin-top:8px"></div></div>',
+            '<div class="card"><h2>Behavior — tap each (calls the real API)</h2><p class="note">Tap the buttons one at a time — running them all at once can crash the in-app browser. window.open opens a visible view you must eyeball; the rest report resolve/reject.</p><table id="behavior"></table><div id="fsbox">fullscreen target</div></div>',
+            '<div class="card"><h2>Storage Access — cross-site third party</h2><div id="storageMode" class="note"></div><iframe id="spframe" allow="storage-access" referrerpolicy="no-referrer-when-downgrade"></iframe><p class="note">Tap "Run storage test" <em>inside the frame</em>. This is the valid third-party test (v2 tested it first-party, where it always resolves).</p></div>',
+            '<div class="card"><h2>Capabilities (presence only)</h2><p class="note">Whether the API <em>exists</em>. Presence ≠ works — see the behavior + storage cards.</p><table id="caps"></table></div>',
+            '<div class="card"><h2>Injected globals (fingerprints)</h2><p class="note">Own properties on the top frame absent from a pristine same-origin iframe — i.e. host injections. Vendor-matched names flagged ★.</p><table id="injected"></table></div>',
+            '<div class="card"><h2>Snapshot JSON</h2><div class="row"><button id="copyBtn">Copy</button><span class="note" id="copyResult"></span></div><pre id="json"></pre></div>',
+          ].join("");
+          document.getElementById("app").innerHTML = TOP_HTML;
+          var results = {};
+
+          function set(id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; }
+          function statusCell(present) {
+            return present ? '<span class="status ok">present</span>' : '<span class="status blocked">absent</span>';
+          }
+          function esc(s) { return String(s).replace(/</g, "&lt;"); }
+          function qp(name) {
+            var m = new RegExp("[?&]" + name + "=([^&]+)").exec(location.search);
+            return m ? decodeURIComponent(m[1]) : null;
+          }
+
+          var win = window;
+          var nav = navigator;
+          var ua = nav.userAgent || "";
+          set("ua", esc(ua));
+
+          var APP_PATTERNS = [
+            ["meta-fb", /FBAN|FBAV|FB_IAB|FB4A/i],
+            ["meta-ig", /Instagram/i],
+            ["tiktok", /musical_ly|TikTok|trill/i],
+            ["linkedin", /LinkedInApp/i],
+            ["snapchat", /Snapchat/i],
+            ["pinterest", /Pinterest/i],
+          ];
+          var detectedApp = null;
+          for (var i = 0; i < APP_PATTERNS.length; i++) {
+            if (APP_PATTERNS[i][1].test(ua)) { detectedApp = APP_PATTERNS[i][0]; break; }
+          }
+          results.userAgent = ua;
+          results.detectedApp = detectedApp;
+          results.isIAB = detectedApp !== null;
+          set("detected", detectedApp
+            ? "Detected in-app browser: <strong>" + detectedApp + "</strong>"
+            : "No known in-app browser detected (looks like a normal browser).");
+
+          // --- Passive capability battery ---
+          var checks = [
+            ["window.PaymentRequest", "PaymentRequest" in win, false, "Stripe/Apple/Google Pay via PaymentRequest"],
+            ["window.ApplePaySession", "ApplePaySession" in win, false, "Apple Pay JS (iOS only)"],
+            ["navigator.serviceWorker", "serviceWorker" in nav, false, "PWA / offline / push"],
+            ["navigator.clipboard", "clipboard" in nav, true, "presence; see behavior test"],
+            ["navigator.share", "share" in nav, true, "Web Share"],
+            ["navigator.credentials", "credentials" in nav, null, "WebAuthn/passkeys"],
+            ["window.PublicKeyCredential", "PublicKeyCredential" in win, null, "passkeys"],
+            ["document.requestStorageAccess", !!document.requestStorageAccess, true, "presence; see storage-access card"],
+            ["Element.requestFullscreen", !!(win.Element && Element.prototype.requestFullscreen), true, "presence; see behavior test"],
+            ["window.Notification", "Notification" in win, null, "web push permission"],
+            ["navigator.mediaDevices.getUserMedia", !!(nav.mediaDevices && nav.mediaDevices.getUserMedia), null, "camera/mic"],
+            ["window.RTCPeerConnection", "RTCPeerConnection" in win, null, "WebRTC"],
+            ["navigator.geolocation", "geolocation" in nav, true, "presence; prompt may be blocked"],
+            ["window.indexedDB", "indexedDB" in win, true, "subject to 7-day purge on iOS"],
+            ["window.localStorage", "localStorage" in win, true, "subject to 7-day purge on iOS"],
+            ["navigator.cookieEnabled", nav.cookieEnabled === true, true, ""],
+            ["window.WebGLRenderingContext", "WebGLRenderingContext" in win, true, ""],
+            ["window.showOpenFilePicker", "showOpenFilePicker" in win, false, "File System Access API"],
+            ["document.featurePolicy", !!(document.featurePolicy || document.policy), null, "reported present in 2019 FB4A"],
+          ];
+          var capHtml = "";
+          var caps = {};
+          for (var c = 0; c < checks.length; c++) {
+            var label = checks[c][0], present = !!checks[c][1], expected = checks[c][2], note = checks[c][3];
+            caps[label] = present;
+            var mismatch = expected !== null && present !== expected ? '<span class="status warn"> ⚠ unexpected</span>' : "";
+            capHtml += "<tr><td>" + label + "</td><td>" + statusCell(present) + mismatch + '</td><td class="note">' + note + "</td></tr>";
+          }
+          set("caps", capHtml);
+          results.capabilities = caps;
+
+          // --- Behavior tests (actually call the API) ---
+          results.behavior = {};
+
+          function fmt(rec) {
+            if (rec.status === "resolved" || rec.status === "constructed" || rec.opened === true) {
+              return '<span class="status ok">' + esc(rec.status || "opened") + "</span> " + '<span class="note">' + esc(rec.detail || "") + "</span>";
             }
-            var closed;
-            try { closed = h.closed; } catch (e) { closed = "<throws>"; }
-            rec.closedImmediately = closed;
-            rec.detail =
-              "returned a window (docWritable=" + rec.docWritable + ", closed=" + closed +
-              "). LOOK: did a new tab/view actually appear? If not, the handle is a decoy.";
-          } catch (e) {
-            rec.opened = false;
-            rec.detail = String(e && e.message || e);
+            if (rec.status === "rejected" || rec.status === "error" || rec.opened === false) {
+              return '<span class="status blocked">' + esc(rec.status || "blocked") + "</span> " + '<span class="note">' + esc(rec.detail || "") + "</span>";
+            }
+            if (rec.status === "unsupported") { return '<span class="status warn">unsupported</span>'; }
+            return '<span class="note">' + esc(rec.detail || "?") + "</span>";
           }
-          return rec;
-        }
 
-        async function testClipboardRead() {
-          if (!(nav.clipboard && nav.clipboard.readText)) return { status: "unsupported" };
+          async function testWindowOpen() {
+            var rec = {};
+            try {
+              var h = win.open("about:blank", "_blank");
+              if (h === null) { rec.opened = false; rec.detail = "window.open returned null — popup blocked."; return rec; }
+              rec.opened = true;
+              try {
+                h.document.write("<meta name=viewport content='width=device-width'><body style='font:18px sans-serif;padding:24px'>iab-probe popup ✓<br>If you can read this, window.open produced a visible view.<br><br><button onclick='window.close()' style='font-size:16px;padding:8px 14px'>close</button></body>");
+                rec.docWritable = true;
+              } catch (e) { rec.docWritable = false; }
+              var closed; try { closed = h.closed; } catch (e) { closed = "<throws>"; }
+              rec.closedImmediately = closed;
+              rec.detail = "returned a window (docWritable=" + rec.docWritable + ", closed=" + closed + "). LOOK: did a new tab/view actually appear? If not, the handle is a decoy.";
+            } catch (e) { rec.opened = false; rec.detail = String(e && e.message || e); }
+            return rec;
+          }
+          async function testClipboardRead() {
+            if (!(nav.clipboard && nav.clipboard.readText)) { return { status: "unsupported" }; }
+            try { var t = await nav.clipboard.readText(); return { status: "resolved", detail: "read " + t.length + " chars" }; }
+            catch (e) { return { status: "rejected", detail: (e.name || "Error") + ": " + (e.message || e) }; }
+          }
+          async function testStorageAccessFirstParty() {
+            if (!document.requestStorageAccess) { return { status: "unsupported" }; }
+            try { await document.requestStorageAccess(); return { status: "resolved", detail: "first-party — trivially resolves; see the cross-site card for the real test" }; }
+            catch (e) { return { status: "rejected", detail: (e.name || "Error") + ": " + (e.message || e) }; }
+          }
+          async function testFullscreen() {
+            var el = document.getElementById("fsbox");
+            if (!(el && el.requestFullscreen)) { return { status: "unsupported" }; }
+            try {
+              await el.requestFullscreen();
+              var active = !!document.fullscreenElement;
+              if (document.exitFullscreen) { try { await document.exitFullscreen(); } catch (e) {} }
+              return { status: "resolved", detail: "becameFullscreen=" + active };
+            } catch (e) { return { status: "rejected", detail: (e.name || "Error") + ": " + (e.message || e) }; }
+          }
+          async function testPaymentRequest() {
+            if (!("PaymentRequest" in win)) { return { status: "unsupported" }; }
+            try {
+              var methods = [
+                { supportedMethods: "https://apple.com/apple-pay", data: { version: 3, merchantIdentifier: "probe", merchantCapabilities: ["supports3DS"], supportedNetworks: ["visa"], countryCode: "US" } },
+                { supportedMethods: "basic-card" },
+              ];
+              var pr = new PaymentRequest(methods, { total: { label: "probe", amount: { currency: "USD", value: "0.00" } } });
+              var can = null;
+              try { can = await pr.canMakePayment(); } catch (e) { can = "canMakePayment threw: " + (e.message || e); }
+              return { status: "constructed", detail: "canMakePayment=" + can };
+            } catch (e) { return { status: "error", detail: (e.name || "Error") + ": " + (e.message || e) }; }
+          }
+
+          results.behavior["window.Notification"] = ("Notification" in win)
+            ? { present: true, permission: (win.Notification && win.Notification.permission) || "unknown" }
+            : { present: false };
+
+          var behaviorTests = [
+            ["window.open", testWindowOpen],
+            ["navigator.clipboard.readText", testClipboardRead],
+            ["document.requestStorageAccess (first-party)", testStorageAccessFirstParty],
+            ["Element.requestFullscreen", testFullscreen],
+            ["PaymentRequest.canMakePayment", testPaymentRequest],
+          ];
+
+          var behaviorHtml = "";
+          var n = results.behavior["window.Notification"];
+          behaviorHtml += '<tr><td>window.Notification</td><td></td><td class="note">' + (n.present ? "present, permission=" + esc(n.permission) : "absent") + "</td></tr>";
+          for (var b = 0; b < behaviorTests.length; b++) {
+            behaviorHtml += '<tr><td>' + behaviorTests[b][0] + '</td><td><button class="small" data-test="' + b + '">test</button></td><td class="note" id="bres' + b + '">not run</td></tr>';
+          }
+          set("behavior", behaviorHtml);
+
+          // Any action the tester takes turns its button green when complete —
+          // green means "you've done this step", regardless of the API's result.
+          function markDone(btn, label) {
+            if (!btn) { return; }
+            btn.style.background = "var(--pass)";
+            btn.style.borderColor = "var(--pass)";
+            btn.style.color = "#fff";
+            btn.textContent = label || "done ✓";
+          }
+          async function runTest(idx, btn) {
+            var name = behaviorTests[idx][0];
+            set("bres" + idx, '<span class="note">running…</span>');
+            var rec = await behaviorTests[idx][1]();
+            results.behavior[name] = rec;
+            set("bres" + idx, fmt(rec));
+            markDone(btn);
+            emit();
+          }
+          document.getElementById("behavior").addEventListener("click", function (e) {
+            var t = e.target;
+            if (t && t.getAttribute && t.getAttribute("data-test") !== null) { runTest(parseInt(t.getAttribute("data-test"), 10), t); }
+          });
+
+          // --- Storage Access (cross-site third party) ---
+          var tp = qp("tp");
+          var frameSrc = tp || location.href.split("#")[0].split("?")[0];
+          results.storageAccess = { configured: !!tp, frameSrc: frameSrc };
+          if (tp) {
+            set("storageMode", 'cross-site frame: <code>' + esc(tp) + "</code> — valid if it is a different site (two <code>*.trycloudflare.com</code> subdomains ARE cross-site).");
+          } else {
+            set("storageMode", '<span class="status blocked">SAME-SITE</span> the frame is this same origin, so it is NOT a valid third-party test. Add <code>?tp=https://OTHER-site/iab-probe.html</code>.');
+          }
+          document.getElementById("spframe").src = frameSrc;
+
+          window.addEventListener("message", function (e) {
+            var d = e.data;
+            if (!(d && d.source === "iab-3p")) { return; }
+            results.storageAccess.frameOrigin = e.origin;
+            results.storageAccess.crossOrigin = e.origin !== location.origin;
+            if (d.payload && d.payload.phase === "result") { results.storageAccess.result = d.payload; }
+            else { results.storageAccess.frameLoaded = true; }
+            emit();
+          });
+
+          // --- Injected globals scan (iframe-diff baseline) ---
+          var VENDOR_HINTS = /fb|facebook|instagram|meta(?!data|element)|tiktok|bytedance|musical|linkedin|snap(?!change|changing|event)|pinterest|jsinterface|javascriptinterface|jsbridge|__fb|gonative|median|iabjs|\biaw\b|iawbridge|promoext/i;
+          var injected = {};
+          function ownNames(obj) {
+            var out = {};
+            try { var names = Object.getOwnPropertyNames(obj); for (var i = 0; i < names.length; i++) { out[names[i]] = true; } } catch (e) {}
+            return out;
+          }
+          function diffInject(live, baseline, objName) {
+            var names = Object.getOwnPropertyNames(live);
+            for (var i = 0; i < names.length; i++) {
+              var key = names[i];
+              if (baseline[key]) { continue; }
+              // Skip numeric frame-index refs (window[0], window[1]…) created by
+              // iframes on the page — they are not host injections.
+              if (/^\d+$/.test(key)) { continue; }
+              var type; try { type = typeof live[key]; } catch (e) { type = "<throws>"; }
+              injected[objName + "." + key] = { type: type, vendor: VENDOR_HINTS.test(key) };
+            }
+          }
+          var baseWin = {}, baseNav = {};
           try {
-            var t = await nav.clipboard.readText();
-            return { status: "resolved", detail: "read " + t.length + " chars" };
-          } catch (e) {
-            return { status: "rejected", detail: (e.name || "Error") + ": " + (e.message || e) };
-          }
-        }
-
-        async function testStorageAccess() {
-          if (!document.requestStorageAccess) return { status: "unsupported" };
+            var fr = document.createElement("iframe");
+            fr.style.display = "none";
+            fr.setAttribute("aria-hidden", "true");
+            document.body.appendChild(fr);
+            if (fr.contentWindow) {
+              baseWin = ownNames(fr.contentWindow);
+              if (fr.contentWindow.navigator) { baseNav = ownNames(fr.contentWindow.navigator); }
+            }
+            document.body.removeChild(fr);
+          } catch (e) {}
+          diffInject(win, baseWin, "window");
+          diffInject(nav, baseNav, "navigator");
           try {
-            await document.requestStorageAccess();
-            return { status: "resolved", detail: "storage access granted" };
-          } catch (e) {
-            return { status: "rejected", detail: (e.name || "Error") + ": " + (e.message || e) };
+            if (win.webkit && win.webkit.messageHandlers) {
+              var mh = win.webkit.messageHandlers;
+              var mhNames = Object.getOwnPropertyNames(mh);
+              for (var m = 0; m < mhNames.length; m++) { injected["window.webkit.messageHandlers." + mhNames[m]] = { type: "messageHandler", vendor: true }; }
+            }
+          } catch (e) {}
+          results.injectedGlobals = injected;
+          var injKeys = Object.keys(injected);
+          injKeys.sort(function (a, b) { return (injected[b].vendor ? 1 : 0) - (injected[a].vendor ? 1 : 0); });
+          if (injKeys.length === 0) {
+            set("injected", '<tr><td class="note" colspan="2">No host-injected globals (top frame matches a clean baseline).</td></tr>');
+          } else {
+            var injHtml = "";
+            for (var j = 0; j < injKeys.length; j++) {
+              var rec2 = injected[injKeys[j]];
+              var flag = rec2.vendor ? '<span class="status warn"> ★ vendor</span>' : "";
+              injHtml += "<tr><td>" + esc(injKeys[j]) + flag + '</td><td class="note">' + esc(rec2.type) + "</td></tr>";
+            }
+            set("injected", injHtml);
           }
-        }
 
-        async function testFullscreen() {
-          var el = document.getElementById("fsbox");
-          if (!(el && el.requestFullscreen)) return { status: "unsupported" };
-          try {
-            await el.requestFullscreen();
-            var active = !!document.fullscreenElement;
-            if (document.exitFullscreen) { try { await document.exitFullscreen(); } catch (e) {} }
-            return { status: "resolved", detail: "becameFullscreen=" + active };
-          } catch (e) {
-            return { status: "rejected", detail: (e.name || "Error") + ": " + (e.message || e) };
+          // --- Emit ---
+          function emit() {
+            results.capturedAt = new Date().toISOString();
+            var json = JSON.stringify(results, null, 2);
+            set("json", esc(json));
+            try { console.log("[iab-probe]", json); } catch (e) {}
           }
-        }
+          document.getElementById("copyBtn").addEventListener("click", function () {
+            var btn = this;
+            var json = JSON.stringify(results, null, 2);
+            if (nav.clipboard && nav.clipboard.writeText) {
+              nav.clipboard.writeText(json).then(
+                function () { set("copyResult", "copied ✓"); markDone(btn, "copied ✓"); },
+                function () { set("copyResult", "copy failed — select the JSON manually"); }
+              );
+            } else { set("copyResult", "no clipboard — select the JSON manually"); }
+          });
 
-        async function testPaymentRequest() {
-          if (!("PaymentRequest" in win)) return { status: "unsupported" };
-          try {
-            var methods = [
-              { supportedMethods: "https://apple.com/apple-pay", data: {
-                version: 3, merchantIdentifier: "probe", merchantCapabilities: ["supports3DS"],
-                supportedNetworks: ["visa"], countryCode: "US" } },
-              { supportedMethods: "basic-card" },
-            ];
-            var pr = new PaymentRequest(methods,
-              { total: { label: "probe", amount: { currency: "USD", value: "0.00" } } });
-            var can = null;
-            try { can = await pr.canMakePayment(); } catch (e) { can = "canMakePayment threw: " + (e.message || e); }
-            return { status: "constructed", detail: "canMakePayment=" + can };
-          } catch (e) {
-            return { status: "error", detail: (e.name || "Error") + ": " + (e.message || e) };
-          }
-        }
-
-        // Passive read (no prompt) for Notification.
-        results.behavior["window.Notification"] = ("Notification" in win)
-          ? { present: true, permission: (win.Notification && win.Notification.permission) || "unknown" }
-          : { present: false };
-
-        var behaviorTests = [
-          ["window.open", testWindowOpen],
-          ["navigator.clipboard.readText", testClipboardRead],
-          ["document.requestStorageAccess", testStorageAccess],
-          ["Element.requestFullscreen", testFullscreen],
-          ["PaymentRequest.canMakePayment", testPaymentRequest],
-        ];
-
-        var behaviorHtml = "";
-        // Notification is passive — show as a static row.
-        var n = results.behavior["window.Notification"];
-        behaviorHtml +=
-          '<tr><td>window.Notification</td><td></td><td class="note">' +
-          (n.present ? "present, permission=" + esc(n.permission) : "absent") + "</td></tr>";
-        for (var b = 0; b < behaviorTests.length; b++) {
-          behaviorHtml +=
-            '<tr><td>' + behaviorTests[b][0] + '</td>' +
-            '<td><button class="small" data-test="' + b + '">test</button></td>' +
-            '<td class="note" id="bres' + b + '">not run</td></tr>';
-        }
-        set("behavior", behaviorHtml);
-
-        async function runTest(idx) {
-          var name = behaviorTests[idx][0];
-          set("bres" + idx, '<span class="note">running…</span>');
-          var rec = await behaviorTests[idx][1]();
-          results.behavior[name] = rec;
-          set("bres" + idx, fmt(rec));
           emit();
         }
-
-        document.getElementById("behavior").addEventListener("click", function (e) {
-          var t = e.target;
-          if (t && t.getAttribute && t.getAttribute("data-test") !== null) {
-            runTest(parseInt(t.getAttribute("data-test"), 10));
-          }
-        });
-        document.getElementById("runAll").addEventListener("click", async function () {
-          for (var k = 0; k < behaviorTests.length; k++) {
-            await runTest(k);
-          }
-        });
-
-        // --- Injected globals scan (iframe-diff baseline) ---
-        var VENDOR_HINTS = /fb|facebook|instagram|meta(?!data|element)|tiktok|bytedance|musical|linkedin|snap(?!change|changing|event)|pinterest|jsinterface|jsbridge|__fb|gonative|median|iabjs|\biaw\b|iawbridge|promoext/i;
-        var injected = {};
-
-        function ownNames(obj) {
-          var out = {};
-          try {
-            var names = Object.getOwnPropertyNames(obj);
-            for (var i = 0; i < names.length; i++) out[names[i]] = true;
-          } catch (e) {}
-          return out;
-        }
-        function diffInject(live, baseline, objName) {
-          var names = Object.getOwnPropertyNames(live);
-          for (var i = 0; i < names.length; i++) {
-            var key = names[i];
-            if (baseline[key]) continue;
-            var type;
-            try { type = typeof live[key]; } catch (e) { type = "<throws>"; }
-            injected[objName + "." + key] = { type: type, vendor: VENDOR_HINTS.test(key) };
-          }
-        }
-
-        var baseWin = {}, baseNav = {};
-        try {
-          var fr = document.createElement("iframe");
-          fr.style.display = "none";
-          fr.setAttribute("aria-hidden", "true");
-          document.body.appendChild(fr);
-          if (fr.contentWindow) {
-            baseWin = ownNames(fr.contentWindow);
-            if (fr.contentWindow.navigator) baseNav = ownNames(fr.contentWindow.navigator);
-          }
-          document.body.removeChild(fr);
-        } catch (e) {}
-
-        diffInject(win, baseWin, "window");
-        diffInject(nav, baseNav, "navigator");
-        try {
-          if (win.webkit && win.webkit.messageHandlers) {
-            var mh = win.webkit.messageHandlers;
-            var mhNames = Object.getOwnPropertyNames(mh);
-            for (var m = 0; m < mhNames.length; m++) {
-              injected["window.webkit.messageHandlers." + mhNames[m]] = { type: "messageHandler", vendor: true };
-            }
-          }
-        } catch (e) {}
-
-        results.injectedGlobals = injected;
-        var injKeys = Object.keys(injected);
-        injKeys.sort(function (a, b) {
-          return (injected[b].vendor ? 1 : 0) - (injected[a].vendor ? 1 : 0);
-        });
-        if (injKeys.length === 0) {
-          set("injected", '<tr><td class="note" colspan="2">No host-injected globals (top frame matches a clean baseline).</td></tr>');
-        } else {
-          var injHtml = "";
-          for (var j = 0; j < injKeys.length; j++) {
-            var rec2 = injected[injKeys[j]];
-            var flag = rec2.vendor ? '<span class="status warn"> ★ vendor</span>' : "";
-            injHtml += "<tr><td>" + esc(injKeys[j]) + flag + '</td><td class="note">' + esc(rec2.type) + "</td></tr>";
-          }
-          set("injected", injHtml);
-        }
-
-        // --- Emit ---
-        function emit() {
-          results.capturedAt = new Date().toISOString();
-          var json = JSON.stringify(results, null, 2);
-          set("json", esc(json));
-          try { console.log("[iab-probe]", json); } catch (e) {}
-        }
-        document.getElementById("copyBtn").addEventListener("click", function () {
-          var json = JSON.stringify(results, null, 2);
-          if (nav.clipboard && nav.clipboard.writeText) {
-            nav.clipboard.writeText(json).then(
-              function () { set("copyResult", "copied ✓"); },
-              function () { set("copyResult", "copy failed — select the JSON manually"); }
-            );
-          } else {
-            set("copyResult", "no clipboard — select the JSON manually");
-          }
-        });
-
-        emit();
       })();
     </script>
   </body>
