@@ -93,9 +93,9 @@ export const apiRestrictions: Restriction[] = [
       "Web push opt-in prompts gated on `window.Notification`",
       "Libraries that feature-detect `Notification` before registering push",
     ],
-    platforms: ["ios"],
+    platforms: ["ios", "android"],
     apps: ["*"],
-    confirmedVersion: "FBAV 579 / iOS 26.6.2",
+    confirmedVersion: "FBAV 578–579 (iOS 26.6.2 / Android 14)",
     confirmedDate: "2026-09",
     ref: "https://developer.mozilla.org/en-US/docs/Web/API/Notification",
     refAlt: "https://caniwebview.com/features/api-notifications/",
@@ -110,6 +110,67 @@ export const apiRestrictions: Restriction[] = [
       Reflect.deleteProperty(win, "Notification");
       console.warn(
         "[iab-emulator] window.Notification removed (Web Notifications unavailable in in-app browsers)"
+      );
+    },
+  },
+
+  {
+    id: "webauthn-unavailable",
+    category: "api",
+    description:
+      "window.PublicKeyCredential is absent, so WebAuthn / passkey feature-detection fails and passkey sign-in cannot start.",
+    breaks: [
+      "Passkey / WebAuthn sign-in gated on `window.PublicKeyCredential`",
+      "`isUserVerifyingPlatformAuthenticatorAvailable()` capability checks",
+    ],
+    platforms: ["android"],
+    apps: ["*"],
+    confirmedVersion: "FB4A 578 / Android 14",
+    confirmedDate: "2026-09",
+    ref: "https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredential",
+    refAlt: "https://caniwebview.com/features/api-webauthn/",
+    emulate(win) {
+      // PublicKeyCredential is a constructor on the global; engines differ on
+      // instance vs prototype placement, so delete from both.
+      const proto = Object.getPrototypeOf(win) as object | null;
+      if (proto) {
+        Reflect.deleteProperty(proto, "PublicKeyCredential");
+      }
+      Reflect.deleteProperty(win, "PublicKeyCredential");
+      console.warn(
+        "[iab-emulator] window.PublicKeyCredential removed (WebAuthn/passkeys unavailable in in-app browsers)"
+      );
+    },
+  },
+
+  {
+    id: "web-share-unavailable",
+    category: "api",
+    description:
+      "navigator.share is absent, so the Web Share API is unavailable and share buttons that feature-detect it fall through.",
+    breaks: [
+      "Native share-sheet buttons gated on `navigator.share`",
+      "`navigator.canShare()` capability checks",
+    ],
+    platforms: ["android"],
+    apps: ["*"],
+    confirmedVersion: "FB4A 578 / Android 14",
+    confirmedDate: "2026-09",
+    ref: "https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share",
+    refAlt: "https://caniwebview.com/features/api-web-share/",
+    emulate(win) {
+      // share/canShare are methods on Navigator.prototype; remove both from the
+      // prototype and any own shadow so feature-detection sees them absent.
+      const nav = win.navigator;
+      const proto = Object.getPrototypeOf(nav) as object | null;
+      if (proto) {
+        Reflect.deleteProperty(proto, "share");
+        Reflect.deleteProperty(proto, "canShare");
+      }
+      Reflect.deleteProperty(nav, "share");
+      Reflect.deleteProperty(nav, "canShare");
+      console.warn(
+        "[iab-emulator] navigator.share removed (Web Share API unavailable in in-app browsers)"
       );
     },
   },

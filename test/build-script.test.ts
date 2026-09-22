@@ -22,8 +22,12 @@ describe("normalizeEmulateSource", () => {
 });
 
 describe("selectRestrictions", () => {
-  it("returns every restriction by default (ios, all apps, all categories)", () => {
-    expect(selectRestrictions()).toHaveLength(allRestrictions.length);
+  it("returns exactly the ios-applicable restrictions by default (all apps, all categories)", () => {
+    const iosApplicable = allRestrictions.filter((r) => r.platforms.includes("ios"));
+    expect(selectRestrictions()).toHaveLength(iosApplicable.length);
+    // Sanity: the manifest carries android-only entries, so the ios default is
+    // a strict subset — never the whole manifest.
+    expect(iosApplicable.length).toBeLessThan(allRestrictions.length);
   });
 
   it("filters out ios-only restrictions on android", () => {
@@ -31,6 +35,15 @@ describe("selectRestrictions", () => {
     const ids = android.map((r) => r.id);
     expect(ids).not.toContain("apple-pay-session-unavailable");
     expect(ids).toContain("window-open-blocked");
+  });
+
+  it("includes android-only restrictions on android but not on ios", () => {
+    const androidIds = selectRestrictions({ platform: "android" }).map((r) => r.id);
+    const iosIds = selectRestrictions({ platform: "ios" }).map((r) => r.id);
+    expect(androidIds).toContain("webauthn-unavailable");
+    expect(androidIds).toContain("web-share-unavailable");
+    expect(iosIds).not.toContain("webauthn-unavailable");
+    expect(iosIds).not.toContain("web-share-unavailable");
   });
 
   it("filters by category", () => {
