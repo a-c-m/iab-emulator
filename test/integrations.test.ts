@@ -74,6 +74,29 @@ describe("vite integration", () => {
     const plugin = iabEmulator({ enabled: false }) as unknown as TestVitePlugin;
     expect(plugin.name).toBe("iab-emulator:disabled");
   });
+
+  it("does not inject the chrome overlay by default", () => {
+    const plugin = iabEmulator() as unknown as TestVitePlugin;
+    const html = plugin.transformIndexHtml("<head></head><body></body>");
+    expect(html).not.toContain("iab-emulator-chrome");
+  });
+
+  it("injects the chrome overlay before </body> when chrome is enabled", () => {
+    const plugin = iabEmulator({ chrome: true, apps: ["meta-ig"] }) as unknown as TestVitePlugin;
+    const html = plugin.transformIndexHtml("<head></head><body></body>");
+    expect(html).toContain("iab-emulator-chrome");
+    expect(html).toContain("Instagram");
+    // Overlay sits inside the body, before its close tag.
+    expect(html.indexOf("iab-emulator-chrome")).toBeLessThan(html.lastIndexOf("</body>"));
+    // Still </script>-safe overall (emulation tag + overlay tag = two closers).
+    expect(html.split("</script>")).toHaveLength(3);
+  });
+
+  it("chrome accepts an explicit app id for the header look", () => {
+    const plugin = iabEmulator({ chrome: "meta-fb" }) as unknown as TestVitePlugin;
+    const html = plugin.transformIndexHtml("<head></head><body></body>");
+    expect(html).toContain("Facebook");
+  });
 });
 
 describe("next integration", () => {

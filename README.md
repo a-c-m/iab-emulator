@@ -50,6 +50,33 @@ export default {
 Injects the emulation script into the served HTML and spoofs the dev-server
 request user-agent.
 
+#### Manual testing — the IAB frame overlay
+
+Want to click through an app and *feel* like you're in the in-app browser?
+Fastest way to see it, straight from a clone of this repo — no flags:
+
+```sh
+pnpm install
+pnpm try            # opens the demo app wrapped in the IAB frame
+```
+
+To turn it on for **your own** app, add `chrome` to the plugin:
+
+```ts
+iabEmulator({ apps: ["meta-fb"], platform: "ios", chrome: true });
+```
+
+`chrome: true` draws a fake in-app-browser shell over your served page — a
+phone status bar, a Facebook/Instagram-style header (site title · ⋯ · ✕) and a
+bottom toolbar — so you (or QA) *see* you're "in" the IAB while the restrictions
+are live. It's presentation only; the restrictions do the real work. Its "Open
+in browser" and "Share" buttons hit the emulated `window.open` /
+`navigator.share`, so they fail exactly as in the real app. Pass an app id
+(`chrome: "meta-ig"`) to force a specific look. Off by default.
+
+Run `vite dev` and open the app on your phone (same Wi-Fi, via the dev server's
+network URL) for the full hand-held effect.
+
 ### Playwright (E2E — on by default)
 
 ```ts
@@ -111,10 +138,11 @@ modes against the same capability-dashboard page:
 - **Control** — a clean server with no emulation, proving the difference.
 
 ```sh
-pnpm demo                       # open the dashboard yourself (clean)
-IAB_DEMO_PLUGIN=1 pnpm demo     # ...with the Vite plugin active
+pnpm demo                                    # open the dashboard yourself (clean)
+IAB_DEMO_PLUGIN=1 pnpm demo                  # ...with the Vite plugin active
+IAB_DEMO_PLUGIN=1 IAB_DEMO_CHROME=1 pnpm demo # ...plus the IAB frame overlay
 pnpm exec playwright install chromium
-pnpm test:e2e                   # run all three modes
+pnpm test:e2e                                # run all three modes
 ```
 
 ## Contributing a restriction
