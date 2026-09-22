@@ -13,7 +13,7 @@ you find them before your users do.
 
 ## What it covers
 
-10 documented restrictions across navigation, payments, storage, and browser
+13 documented restrictions across navigation, payments, storage, and browser
 APIs, on iOS and Android. Sourced from [caniwebview.com](https://caniwebview.com),
 WebKit/Apple references, and confirmed production incidents. Full list:
 [docs/restrictions.md](docs/restrictions.md).

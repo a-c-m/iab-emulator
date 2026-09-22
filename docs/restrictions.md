@@ -34,6 +34,9 @@ a new entry.
 | `service-worker-unavailable` | ios, android | * | 2022-11 | `navigator.serviceWorker` is absent. |
 | `fullscreen-api-blocked` | ios | * | 2023-05 | `Element.requestFullscreen()` rejects. |
 | `clipboard-read-restricted` | ios, android | * | 2023-07 | `navigator.clipboard.readText()` rejects. |
+| `notification-api-unavailable` | ios, android | * | 2026-09 | `window.Notification` is absent, so Web Notifications feature-detection fails. |
+| `webauthn-unavailable` | android | * | 2026-09 | `window.PublicKeyCredential` is absent, so WebAuthn / passkey sign-in cannot start. |
+| `web-share-unavailable` | android | * | 2026-09 | `navigator.share` / `navigator.canShare` are absent (Web Share API unavailable). |
 
 References for each entry live inline in the manifest source under
 `src/restrictions/` (`ref` / `refAlt` fields).

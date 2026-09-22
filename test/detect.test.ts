@@ -1,6 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { detectIAB, getCapabilities, isMetaIAB, supportsPopups } from "../src/detect/index.js";
+import {
+  detectIAB,
+  getCapabilities,
+  hasMetaIABBridge,
+  isMetaIAB,
+  supportsPopups,
+} from "../src/detect/index.js";
 import { getUserAgent } from "../src/emulation/user-agents.js";
+
+function setBridge(): void {
+  (window as unknown as Record<string, unknown>).iabjs = {};
+}
+function clearBridge(): void {
+  Reflect.deleteProperty(window as unknown as Record<string, unknown>, "iabjs");
+}
 
 const CHROME_IOS =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0 Mobile/15E148 Safari/604.1";
@@ -40,6 +53,26 @@ describe("detectIAB", () => {
     // first pattern, so detection is deterministic.
     const ua = "Mozilla/5.0 Instagram 333.0 FBAV/465.0 Mobile";
     expect(detectIAB(ua).app).toBe("meta-fb");
+  });
+});
+
+describe("hasMetaIABBridge and UA-independent fallback", () => {
+  afterEach(clearBridge);
+
+  it("hasMetaIABBridge reflects the presence of an injected bridge global", () => {
+    expect(hasMetaIABBridge()).toBe(false);
+    setBridge();
+    expect(hasMetaIABBridge()).toBe(true);
+  });
+
+  it("detectIAB() with no argument falls back to the bridge when the UA is not an IAB", () => {
+    setBridge();
+    expect(detectIAB()).toEqual({ isIAB: true, app: "meta-fb" });
+  });
+
+  it("detectIAB(ua) with an explicit UA ignores the bridge (pure UA mode)", () => {
+    setBridge();
+    expect(detectIAB(CHROME_IOS)).toEqual({ isIAB: false, app: null });
   });
 });
 

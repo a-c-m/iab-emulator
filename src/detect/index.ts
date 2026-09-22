@@ -36,12 +36,48 @@ function currentUserAgent(): string {
   return typeof navigator === "undefined" ? "" : navigator.userAgent;
 }
 
-/** Detect whether `ua` is a known in-app browser, and which app. */
-export function detectIAB(ua: string = currentUserAgent()): IabDetection {
+/**
+ * Non-standard globals the Meta (Facebook/Instagram) in-app browser injects
+ * into the page. Presence is a user-agent-independent signal — in-app browsers
+ * sometimes strip or normalise their UA, but the injected JS bridge remains.
+ * Observed on FB4A (Android 14, FBAV 578); the exact set evolves across app
+ * builds, so any single match is treated as "Meta in-app browser".
+ */
+const META_BRIDGE_GLOBALS = [
+  "fbpayIAWBridge",
+  "iabjs",
+  "iabjs_unified_bridge",
+  "__call_iabjs_unified_bridge",
+];
+
+/**
+ * True if a Meta (FB/IG) in-app-browser JS bridge is present on `window`. A
+ * user-agent-independent detection signal; safe to call anywhere (returns
+ * `false` when there is no `window`).
+ */
+export function hasMetaIABBridge(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const scope = window as unknown as Record<string, unknown>;
+  return META_BRIDGE_GLOBALS.some((name) => name in scope);
+}
+
+/**
+ * Detect whether `ua` is a known in-app browser, and which app. Called with no
+ * argument it also falls back to {@link hasMetaIABBridge} for the live page, so
+ * a Meta in-app browser is still caught when its UA has been stripped. Pass an
+ * explicit `ua` (e.g. a server request header) for pure UA-only detection.
+ */
+export function detectIAB(ua?: string): IabDetection {
+  const agent = ua ?? currentUserAgent();
   for (const app of Object.keys(APP_PATTERNS) as AppId[]) {
-    if (APP_PATTERNS[app].test(ua)) {
+    if (APP_PATTERNS[app].test(agent)) {
       return { isIAB: true, app };
     }
+  }
+  if (ua === undefined && hasMetaIABBridge()) {
+    return { isIAB: true, app: "meta-fb" };
   }
   return { isIAB: false, app: null };
 }

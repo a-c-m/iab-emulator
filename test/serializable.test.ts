@@ -133,6 +133,27 @@ const EFFECTS: Effect[] = [
       );
     },
   },
+  {
+    id: "notification-api-unavailable",
+    setup: (win) => define(win, "Notification", class {}),
+    assert: (win) => {
+      expect("Notification" in win).toBe(false);
+    },
+  },
+  {
+    id: "webauthn-unavailable",
+    setup: (win) => define(win, "PublicKeyCredential", class {}),
+    assert: (win) => {
+      expect("PublicKeyCredential" in win).toBe(false);
+    },
+  },
+  {
+    id: "web-share-unavailable",
+    setup: (win) => define(win.navigator, "share", () => Promise.resolve()),
+    assert: (win) => {
+      expect("share" in win.navigator).toBe(false);
+    },
+  },
 ];
 
 describe("each emulate still produces its effect after serialization", () => {
