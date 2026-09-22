@@ -117,6 +117,65 @@ pnpm exec playwright install chromium
 pnpm test:e2e                   # run all three modes
 ```
 
+## Capturing real IAB behavior (the probe)
+
+The manifest is only as good as the ground truth behind it. `tools/iab-probe.html`
+is a standalone, dependency-free page that captures exactly what a **real**
+in-app browser does — load it inside the Facebook/Instagram/TikTok app and it
+reports, as one JSON blob:
+
+- **Capabilities** — which APIs are present vs absent
+- **Behavior** — what actually happens when you *call* them (`window.open`,
+  `clipboard.readText`, `requestFullscreen`, `PaymentRequest.canMakePayment`),
+  reported as resolve/reject, not just presence
+- **Storage Access** — a valid cross-site test: a genuine third-party frame
+  calling `requestStorageAccess()` inside a user gesture, plus third-party
+  cookie and `localStorage` partition checks
+- **Injected globals** — host-injected bridges (e.g. Meta's `iabjs_unified_bridge`,
+  `fbpayIAWBridge`), found by diffing against a pristine same-origin iframe
+
+The page is dual-mode: at the top level it runs the full battery; loaded inside
+an iframe it becomes the third-party frame for the storage test.
+
+### Run it yourself
+
+You need the page reachable over **HTTPS from your phone**, and — for the
+storage test — served from **two different sites**. Two Cloudflare quick tunnels
+do both: `trycloudflare.com` is on the Public Suffix List, so two of its
+subdomains count as cross-site.
+
+```sh
+# 1. Serve the probe (any static server; port is arbitrary)
+python3 -m http.server 8787 --directory tools
+
+# 2. In two more shells, expose it twice — a PUBLISHER url and a FRAME url.
+#    (Needs the `cloudflared` binary: https://github.com/cloudflare/cloudflared)
+cloudflared tunnel --url http://localhost:8787   # note the https://<PUBLISHER>.trycloudflare.com
+cloudflared tunnel --url http://localhost:8787   # note the https://<FRAME>.trycloudflare.com
+```
+
+Open this on your phone **inside the app** (DM the link to yourself, then tap it):
+
+```
+https://<PUBLISHER>.trycloudflare.com/iab-probe.html?tp=https://<FRAME>.trycloudflare.com/iab-probe.html
+```
+
+Then:
+
+1. Confirm the **Setup** card says "cross-site frame configured" (not the red
+   SAME-SITE warning) — that means the `?tp=` frame is a valid third party.
+2. Tap each **behavior** button **one at a time** — running them in quick
+   succession can crash the in-app browser. `window.open` opens a visible view
+   you eyeball; the rest report resolve/reject. Buttons turn green when done.
+3. Tap **Run storage test** *inside* the embedded frame.
+4. Tap **Copy** to grab the JSON — or read it from the `[iab-probe]` console
+   line via remote debugging (`chrome://inspect` on Android; Safari ›
+   Develop › your device on iOS).
+
+Diff the JSON against [docs/restrictions.md](docs/restrictions.md); a mismatch
+is a candidate restriction (or a stale one). That's how the current manifest was
+verified against Meta on iOS and Android.
+
 ## Contributing a restriction
 
 The manifest grows through PRs. See [CONTRIBUTING.md](CONTRIBUTING.md) — the
