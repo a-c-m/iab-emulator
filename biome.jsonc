@@ -2,7 +2,11 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "extends": ["ultracite/biome/core", "ultracite/biome/vitest"],
   "files": {
-    "includes": ["**/*.ts", "**/*.js", "**/*.json", "**/*.jsonc"],
+    // tools/ holds standalone diagnostics (the capability probe) that are NOT
+    // published and are deliberately old-style, un-minified JS so they run in
+    // ancient in-app WebViews — linting/formatting them to modern idioms would
+    // defeat that. They ship nowhere (see package.json "files").
+    "includes": ["**/*.ts", "**/*.js", "**/*.json", "**/*.jsonc", "!tools"],
     "ignoreUnknown": true
   },
   "vcs": {
