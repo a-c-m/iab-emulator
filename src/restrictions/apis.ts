@@ -83,4 +83,34 @@ export const apiRestrictions: Restriction[] = [
       }
     },
   },
+
+  {
+    id: "notification-api-unavailable",
+    category: "api",
+    description:
+      "window.Notification is absent, so Web Notifications feature-detection fails and permission can never be requested.",
+    breaks: [
+      "Web push opt-in prompts gated on `window.Notification`",
+      "Libraries that feature-detect `Notification` before registering push",
+    ],
+    platforms: ["ios"],
+    apps: ["*"],
+    confirmedVersion: "FBAV 579 / iOS 26.6.2",
+    confirmedDate: "2026-09",
+    ref: "https://developer.mozilla.org/en-US/docs/Web/API/Notification",
+    refAlt: "https://caniwebview.com/features/api-notifications/",
+    emulate(win) {
+      // Notification is a constructor exposed on the global. Engines differ on
+      // whether it sits on the instance or the prototype, so delete from both —
+      // that is what makes `"Notification" in window` false, as in a real IAB.
+      const proto = Object.getPrototypeOf(win) as object | null;
+      if (proto) {
+        Reflect.deleteProperty(proto, "Notification");
+      }
+      Reflect.deleteProperty(win, "Notification");
+      console.warn(
+        "[iab-emulator] window.Notification removed (Web Notifications unavailable in in-app browsers)"
+      );
+    },
+  },
 ];

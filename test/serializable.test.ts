@@ -133,6 +133,13 @@ const EFFECTS: Effect[] = [
       );
     },
   },
+  {
+    id: "notification-api-unavailable",
+    setup: (win) => define(win, "Notification", class {}),
+    assert: (win) => {
+      expect("Notification" in win).toBe(false);
+    },
+  },
 ];
 
 describe("each emulate still produces its effect after serialization", () => {

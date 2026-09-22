@@ -164,6 +164,16 @@ describe("api", () => {
 
     await expect(win.navigator.clipboard.readText()).rejects.toThrow("clipboard.readText blocked");
   });
+
+  it("notification-api-unavailable removes window.Notification", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const win = freshWindow();
+    define(win, "Notification", class {});
+
+    apply(win, "notification-api-unavailable");
+
+    expect("Notification" in win).toBe(false);
+  });
 });
 
 describe("idempotency", () => {

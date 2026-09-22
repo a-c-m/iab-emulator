@@ -34,6 +34,7 @@ a new entry.
 | `service-worker-unavailable` | ios, android | * | 2022-11 | `navigator.serviceWorker` is absent. |
 | `fullscreen-api-blocked` | ios | * | 2023-05 | `Element.requestFullscreen()` rejects. |
 | `clipboard-read-restricted` | ios, android | * | 2023-07 | `navigator.clipboard.readText()` rejects. |
+| `notification-api-unavailable` | ios | * | 2026-09 | `window.Notification` is absent, so Web Notifications feature-detection fails. |
 
 References for each entry live inline in the manifest source under
 `src/restrictions/` (`ref` / `refAlt` fields).
