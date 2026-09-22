@@ -52,8 +52,15 @@ request user-agent.
 
 #### Manual testing — the IAB frame overlay
 
-Want to click through your own app and *feel* like you're in the in-app
-browser? Turn on `chrome`:
+Want to click through an app and *feel* like you're in the in-app browser?
+Fastest way to see it, straight from a clone of this repo — no flags:
+
+```sh
+pnpm install
+pnpm try            # opens the demo app wrapped in the IAB frame
+```
+
+To turn it on for **your own** app, add `chrome` to the plugin:
 
 ```ts
 iabEmulator({ apps: ["meta-fb"], platform: "ios", chrome: true });
