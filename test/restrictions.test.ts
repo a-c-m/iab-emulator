@@ -174,6 +174,28 @@ describe("api", () => {
 
     expect("Notification" in win).toBe(false);
   });
+
+  it("webauthn-unavailable removes window.PublicKeyCredential", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const win = freshWindow();
+    define(win, "PublicKeyCredential", class {});
+
+    apply(win, "webauthn-unavailable");
+
+    expect("PublicKeyCredential" in win).toBe(false);
+  });
+
+  it("web-share-unavailable removes navigator.share and canShare", () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const win = freshWindow();
+    define(win.navigator, "share", () => Promise.resolve());
+    define(win.navigator, "canShare", () => true);
+
+    apply(win, "web-share-unavailable");
+
+    expect("share" in win.navigator).toBe(false);
+    expect("canShare" in win.navigator).toBe(false);
+  });
 });
 
 describe("idempotency", () => {
