@@ -21,6 +21,9 @@ function echoUserAgent(): Plugin {
 //   IAB_DEMO_PLUGIN=1 vite  -> emulation auto-injected (plugin mode)
 //   vite                    -> clean page (for the Playwright-fixture path)
 const pluginEnabled = process.env.IAB_DEMO_PLUGIN === "1";
+// Separate gate so the IAB frame overlay is opt-in and never affects the e2e
+// runs (which set IAB_DEMO_PLUGIN only): IAB_DEMO_CHROME=1 draws the frame.
+const chromeEnabled = process.env.IAB_DEMO_CHROME === "1";
 
 export default defineConfig({
   root: import.meta.dirname,
@@ -29,6 +32,6 @@ export default defineConfig({
     fs: { allow: [".."] },
   },
   plugins: pluginEnabled
-    ? [iabEmulator({ apps: ["meta-ig"], platform: "ios" }), echoUserAgent()]
+    ? [iabEmulator({ apps: ["meta-ig"], platform: "ios", chrome: chromeEnabled }), echoUserAgent()]
     : [echoUserAgent()],
 });
