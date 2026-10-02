@@ -33,8 +33,8 @@ export function buildChromeOverlay(app: AppScope): string {
   return `<style>
 #iab-emulator-chrome,#iab-emulator-chrome *{box-sizing:border-box;}
 #iab-emulator-chrome{position:fixed;left:0;right:0;z-index:2147483646;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
-#iab-emulator-chrome .iab-top{position:fixed;top:0;left:0;right:0;background:#fff;color:#050505;border-bottom:1px solid #dadde1;}
-#iab-emulator-chrome .iab-bottom{position:fixed;bottom:0;left:0;right:0;height:44px;background:#fff;color:#050505;border-top:1px solid #dadde1;display:flex;align-items:center;justify-content:space-around;}
+#iab-emulator-chrome .iab-top{position:fixed;top:0;left:0;right:0;background:#fff;color:#050505;border-bottom:1px solid #dadde1;box-shadow:0 2px 10px rgba(0,0,0,.06);}
+#iab-emulator-chrome .iab-bottom{position:fixed;bottom:0;left:0;right:0;height:44px;background:#fff;color:#050505;border-top:1px solid #dadde1;box-shadow:0 -2px 10px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-around;}
 @media (prefers-color-scheme:dark){#iab-emulator-chrome .iab-top,#iab-emulator-chrome .iab-bottom{background:#242526;color:#e4e6eb;border-color:#3e4042;}}
 #iab-emulator-chrome .iab-status{height:28px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-size:13px;font-weight:600;}
 #iab-emulator-chrome .iab-glyphs{letter-spacing:1px;font-size:12px;}

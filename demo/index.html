@@ -4,38 +4,273 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>iab-emulator capability dashboard</title>
+    <style>
+    :root {
+      --bg: #f2f3f5;
+      --surface: #ffffff;
+      --fg: #111318;
+      --muted: #5e636e;
+      --border: #e2e4e9;
+      --accent: #1877f2;
+      --good: #1a7f37;
+      --good-bg: #e6f4ea;
+      --bad: #c0362c;
+      --bad-bg: #fbeae8;
+      --neutral-bg: #eef0f3;
+      --code-bg: #f6f8fa;
+      --radius: 14px;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.04);
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --fg: #e6edf3;
+        --muted: #9aa4b2;
+        --border: #272c34;
+        --accent: #4493f8;
+        --good: #3fb950;
+        --good-bg: #122017;
+        --bad: #f26b61;
+        --bad-bg: #2a1512;
+        --neutral-bg: #1c2129;
+        --code-bg: #0b0e13;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.3);
+      }
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.55;
+      color: var(--fg);
+      background: var(--bg);
+    }
+    .page {
+      max-width: 680px;
+      padding: 28px 20px 64px;
+      margin: 0 auto;
+    }
+    .masthead {
+      margin-bottom: 20px;
+    }
+    .kicker {
+      display: inline-block;
+      margin: 0 0 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 26px;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+    .lede {
+      margin: 0;
+      font-size: 14.5px;
+      color: var(--muted);
+    }
+    .card {
+      padding: 18px 18px 20px;
+      margin-top: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .probes {
+      display: grid;
+      gap: 2px;
+      margin: 0;
+    }
+    .probe {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 0;
+      border-top: 1px solid var(--border);
+    }
+    .probe:first-child {
+      border-top: 0;
+    }
+    .probe dt {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--fg);
+    }
+    .probe dd {
+      margin: 0;
+    }
+    .pill {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      padding: 3px 10px 3px 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--muted);
+      white-space: nowrap;
+      background: var(--neutral-bg);
+      border-radius: 999px;
+    }
+    .pill::before {
+      width: 7px;
+      height: 7px;
+      content: "";
+      background: currentColor;
+      border-radius: 50%;
+      opacity: 0.85;
+    }
+    .pill--good {
+      color: var(--good);
+      background: var(--good-bg);
+    }
+    .pill--bad {
+      color: var(--bad);
+      background: var(--bad-bg);
+    }
+    .ua-block {
+      margin-top: 14px;
+    }
+    .ua-label {
+      display: block;
+      margin-bottom: 6px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    code[data-testid],
+    pre[data-testid] {
+      display: block;
+      padding: 10px 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--fg);
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    .action {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 7px 0;
+    }
+    .action + .action {
+      border-top: 1px solid var(--border);
+    }
+    button,
+    .linkish {
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button {
+      padding: 8px 14px;
+      color: var(--fg);
+      appearance: none;
+      background: var(--neutral-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      transition: filter 0.12s ease;
+    }
+    button:hover {
+      filter: brightness(0.97);
+    }
+    button:active {
+      filter: brightness(0.93);
+    }
+    .linkish {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .linkish:hover {
+      text-decoration: underline;
+    }
+    </style>
   </head>
   <body>
-    <h1>iab-emulator capability dashboard</h1>
-    <p>
-      This page probes browser capabilities that in-app browsers restrict. With emulation active
-      (Vite plugin or Playwright fixture) the probes report the restricted state; without it, they
-      report the real browser's state.
-    </p>
+    <div class="page">
+      <header class="masthead">
+        <span class="kicker">iab-emulator</span>
+        <h1>Capability dashboard</h1>
+        <p class="lede">
+          Probes the browser capabilities in-app browsers restrict. With emulation active (the Vite
+          plugin or Playwright fixture) the probes report the restricted state; without it, the real
+          browser's state.
+        </p>
+      </header>
 
-    <ul>
-      <li>PaymentRequest: <strong data-testid="payment-request">?</strong></li>
-      <li>navigator.serviceWorker: <strong data-testid="service-worker">?</strong></li>
-      <li>detected IAB app (client UA): <strong data-testid="detected-app">?</strong></li>
-      <li>server-observed user-agent: <code data-testid="server-ua">?</code></li>
-    </ul>
+      <section class="card">
+        <h2>Environment</h2>
+        <dl class="probes">
+          <div class="probe">
+            <dt>window.PaymentRequest</dt>
+            <dd><span class="pill" data-testid="payment-request">?</span></dd>
+          </div>
+          <div class="probe">
+            <dt>navigator.serviceWorker</dt>
+            <dd><span class="pill" data-testid="service-worker">?</span></dd>
+          </div>
+          <div class="probe">
+            <dt>detected IAB app (client UA)</dt>
+            <dd><span class="pill" data-testid="detected-app">?</span></dd>
+          </div>
+        </dl>
+        <div class="ua-block">
+          <span class="ua-label">server-observed user-agent</span>
+          <code data-testid="server-ua">?</code>
+        </div>
+      </section>
 
-    <p>
-      <button id="popup-btn" type="button">open cross-origin popup</button>
-      <strong aria-live="polite" data-testid="popup-result">?</strong>
-    </p>
+      <section class="card">
+        <h2>Interactive probes</h2>
+        <div class="action">
+          <button id="popup-btn" type="button">open cross-origin popup</button>
+          <span class="pill" aria-live="polite" data-testid="popup-result">?</span>
+        </div>
+        <div class="action">
+          <button id="popups-btn" type="button">probe supportsPopups()</button>
+          <span class="pill" aria-live="polite" data-testid="popups-result">?</span>
+        </div>
+        <div class="action">
+          <a id="blank-link" class="linkish" target="_blank" href="http://127.0.0.1:9/"
+            >external link (new tab)</a
+          >
+          <span class="pill" aria-live="polite" data-testid="blank-result">?</span>
+        </div>
+      </section>
 
-    <p>
-      <button id="popups-btn" type="button">probe supportsPopups()</button>
-      <strong aria-live="polite" data-testid="popups-result">?</strong>
-    </p>
-
-    <p>
-      <a id="blank-link" target="_blank" href="http://127.0.0.1:9/">external link (new tab)</a>
-      <strong aria-live="polite" data-testid="blank-result">?</strong>
-    </p>
-
-    <pre data-testid="client-ua"></pre>
+      <section class="card">
+        <h2>Client user-agent</h2>
+        <pre data-testid="client-ua"></pre>
+      </section>
+    </div>
 
     <script type="module" src="./main.ts"></script>
   </body>
