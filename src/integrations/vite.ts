@@ -1,5 +1,6 @@
 import type { Plugin } from "vite";
 import { buildEmulationScript } from "../emulation/build-script.js";
+import { buildChromeOverlay } from "../emulation/chrome-overlay.js";
 import { getUserAgent } from "../emulation/user-agents.js";
 import { htmlScriptTag, type IabIntegrationOptions, resolveEnabled } from "./options.js";
 
@@ -34,6 +35,10 @@ export function iabEmulator(options: IabViteOptions = {}): Plugin {
     categories: options.categories,
     userAgent: spoofUserAgent,
   });
+  // Optional visual IAB chrome. `true` → the primary app; an app id → that look.
+  const overlay = options.chrome
+    ? buildChromeOverlay(typeof options.chrome === "string" ? options.chrome : primaryApp)
+    : "";
 
   return {
     name: "iab-emulator",
@@ -51,7 +56,13 @@ export function iabEmulator(options: IabViteOptions = {}): Plugin {
     },
 
     transformIndexHtml(html) {
-      return html.replace("<head>", `<head>${htmlScriptTag(script)}`);
+      const withScript = html.replace("<head>", `<head>${htmlScriptTag(script)}`);
+      if (!overlay) {
+        return withScript;
+      }
+      return withScript.includes("</body>")
+        ? withScript.replace("</body>", `${overlay}</body>`)
+        : withScript + overlay;
     },
   };
 }

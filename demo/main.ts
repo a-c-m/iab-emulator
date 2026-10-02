@@ -4,10 +4,24 @@
 // Playwright e2e suite asserts on.
 import { detectIAB, supportsPopups } from "../src/detect/index.js";
 
+// Restricted (in-app-browser) outcomes vs. unrestricted ones — drives the pill
+// colour only. The text content is left exactly as the e2e asserts it.
+const RESTRICTED = new Set(["absent", "blocked", "suppressed"]);
+const UNRESTRICTED = new Set(["present", "opened", "supported", "default"]);
+
 function set(testid: string, value: string): void {
   const el = document.querySelector(`[data-testid="${testid}"]`);
-  if (el) {
-    el.textContent = value;
+  if (!el) {
+    return;
+  }
+  el.textContent = value;
+  if (el.classList.contains("pill")) {
+    el.classList.remove("pill--good", "pill--bad");
+    if (RESTRICTED.has(value)) {
+      el.classList.add("pill--bad");
+    } else if (UNRESTRICTED.has(value)) {
+      el.classList.add("pill--good");
+    }
   }
 }
 
